@@ -455,12 +455,25 @@ if ($Script:IsAdmin -and (-not $NoSystemClean)) {
         Write-Log "DISM cleanup skipped: $($_.Exception.Message)" "WARN"
     }
 
-    # 2. cleanmgr /sagerun (预设)
+    # 2. cleanmgr 磁盘清理（带超时，防止无预设配置时卡死）
     try {
-        Write-Host "    [cleanmgr] Disk cleanup..." -ForegroundColor DarkGray
-        Start-Process -FilePath "cleanmgr.exe" -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
-        Write-Log "cleanmgr disk cleanup completed." "SUCCESS"
-        Write-Host "    [cleanmgr] Done" -ForegroundColor DarkGray
+        # 检查 cleanmgr /sagerun:1 预设是否存在
+        $sagesetPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CleanMgrSageset1"
+        $hasSageset = (Test-Path $sagesetPath) -and ((Get-ItemProperty -Path $sagesetPath -Name "CleanMgrSageset1" -ErrorAction SilentlyContinue) -ne $null)
+
+        $cmArgs = if ($hasSageset) { "/sagerun:1" } else { "/lowdisk" }
+        Write-Host "    [cleanmgr] Disk cleanup (${cmArgs})..." -ForegroundColor DarkGray
+
+        $cmProc = Start-Process -FilePath "cleanmgr.exe" -ArgumentList $cmArgs -PassThru
+        $cmDone = $cmProc.WaitForExit(120000)  # 2 分钟超时
+        if (-not $cmDone) {
+            $cmProc.Kill()
+            Write-Log "cleanmgr timed out (2min)." "WARN"
+            Write-Host "    [cleanmgr] Timed out after 2 min, skipped" -ForegroundColor Yellow
+        } else {
+            Write-Log "cleanmgr disk cleanup completed." "SUCCESS"
+            Write-Host "    [cleanmgr] Done" -ForegroundColor DarkGray
+        }
     }
     catch {
         Write-Log "cleanmgr skipped: $($_.Exception.Message)" "WARN"
