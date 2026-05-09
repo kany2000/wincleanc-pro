@@ -1,0 +1,16 @@
+# Logs
+*.log
+logs/
+
+# Temp / output files
+clean_result.txt
+run_output.txt
+run_out.txt
+Run_Clean.ps1
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Scripts outside repo
+/C:
